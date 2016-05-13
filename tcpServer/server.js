@@ -9,17 +9,27 @@ var results = [];
 var cpuCount = api.os.cpus().length;
 var clientWorkers = [];
 var index = {};
+var numberOfTasks = [];
 
 var server = api.net.createServer(function(socket) {
 
+  restart();
 
   clientWorkers.push(socket);
   index[socket] = clientWorkers.length;
-  var startPoint = (task.length / cpuCount) * (clientWorkers.length - 1);
-  var endPoint = startPoint + (task.length / cpuCount);
-  console.log(startPoint + " " + endPoint);
-  var dataToProcess = JSON.stringify(task.slice(startPoint, endPoint));
-  socket.write(dataToProcess);
+  numberOfTasks.push(task[0]);
+  recalculateTasks();
+  var startPoint = 0;
+  var endPoint = numberOfTasks[0];
+  var counter = 0;
+  for(var i = 0; i < clientWorkers.length; i++){
+    var dataToProcess = JSON.stringify(task.slice(startPoint, endPoint));
+    startPoint = endPoint;
+    endPoint = endPoint + numberOfTasks[++counter];
+    clientWorkers[i].write(dataToProcess);
+  }
+
+
 
   socket.on('data', function(data){
     console.log('Data received (by server)'  + data);
@@ -29,3 +39,20 @@ var server = api.net.createServer(function(socket) {
 
 }).listen(8080);
 
+function restart(){
+
+  results = [];
+}
+
+function recalculateTasks(){
+  var tasks = Math.floor(task.length / clientWorkers.length);
+  console.log(tasks);
+  var uncomplettedTasks = task.length;
+  for(var i = 0; i < numberOfTasks.length; i++){
+      uncomplettedTasks = uncomplettedTasks - tasks;
+      numberOfTasks[i] = tasks;
+  }
+  if(uncomplettedTasks > 0){
+    numberOfTasks[numberOfTasks.length-1] = numberOfTasks[numberOfTasks.length-1] + uncomplettedTasks;
+  }
+}
